@@ -3,7 +3,7 @@ import os
 import sqlite3
 import hmac
 
-app = Flask(_name_)
+app = Flask (__name__)
 
 DB = "clickcrew_postback.db"
 SECRET = os.environ.get("POSTBACK_SECRET", "")

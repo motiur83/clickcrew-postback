@@ -15,7 +15,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 member_id TEXT,
                 offer_id TEXT,
-                click_id TEXT,
+                click_id TEXT UNIQUE,
                 payout REAL,
                 country TEXT,
                 os TEXT,
@@ -32,18 +32,15 @@ def postback():
     if not SECRET:
         return jsonify({"error": "Receiver not configured"}), 503
 
-    if not hmac.compare_digest(
-        request.args.get("key", ""), SECRET
-    ):
+    if not hmac.compare_digest(request.args.get("key", ""), SECRET):
         return jsonify({"error": "Unauthorized"}), 401
 
     member = request.args.get("token_1", "")
     offer = request.args.get("token_2", "")
     click_id = request.args.get("click_id", "")
-    payout = request.args.get("payout", "0")
 
     try:
-        payout = float(payout)
+        payout = float(request.args.get("payout", "0"))
     except ValueError:
         return jsonify({"error": "Invalid payout"}), 400
 
@@ -52,26 +49,23 @@ def postback():
 
     init_db()
 
-    with sqlite3.connect(DB) as con:
-        con.execute("""
-            INSERT INTO conversions
-            (member_id, offer_id, click_id, payout, country, os)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            member,
-            offer,
-            click_id,
-            payout,
-            request.args.get("country", ""),
-            request.args.get("os", "")
-        ))
+    try:
+        with sqlite3.connect(DB) as con:
+            con.execute("""
+                INSERT INTO conversions
+                (member_id, offer_id, click_id, payout, country, os)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                member, offer, click_id, payout,
+                request.args.get("country", ""),
+                request.args.get("os", "")
+            ))
+    except sqlite3.IntegrityError:
+        return jsonify({"status": "duplicate"})
 
     return jsonify({"status": "success"})
 
 init_db()
 
-if name == "main":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000))
-    )
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
